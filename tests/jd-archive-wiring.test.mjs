@@ -18,6 +18,7 @@
  */
 
 import { pass, fail, ROOT } from './helpers.mjs';
+import { FROZEN_EVALUATION_MODES, discoverEvaluationModes, readModeText } from './evaluation-mode-parity-helpers.mjs';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
@@ -74,6 +75,19 @@ try {
     pass('modes/oferta.md states JD archival as required (matches the Machine Summary "required" phrasing style)');
   } else {
     fail('modes/oferta.md does not state JD archival as a required step');
+  }
+
+  // A market's evaluation mode replaces oferta.md when language.modes_dir
+  // points at it, so its template must carry the section too, with the heading
+  // in English: check-jd-archive.mjs finds it by name. Frozen files are exempt
+  // until their re-sync (#3669, #3828) brings the section with it.
+  const localizedWithoutArchive = discoverEvaluationModes(ROOT)
+    .filter(file => !FROZEN_EVALUATION_MODES.has(file))
+    .filter(file => !readModeText(ROOT, `modes/${file}`).includes('\n## Job Description (archived verbatim)\n'));
+  if (localizedWithoutArchive.length === 0) {
+    pass('every re-synced localized evaluation mode carries a Job Description (archived verbatim) section');
+  } else {
+    fail(`localized evaluation modes missing the Job Description (archived verbatim) section: ${localizedWithoutArchive.join(', ')}`);
   }
 
   const pdfDoc = readFile('modes/pdf.md');
