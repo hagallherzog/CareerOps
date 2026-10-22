@@ -10,8 +10,8 @@ Built and used by [santifer](https://santifer.io) for his own job search: 740 li
 
 Two layers — full list in `DATA_CONTRACT.md`:
 
-- **User Layer (NEVER auto-updated; personalization goes HERE):** `cv.md`, `config/profile.yml`, `modes/_profile.md`, `modes/_custom.md`, `article-digest.md`, `portals.yml`, `data/*`, `documents/*`, `reports/*`, `output/*`, `interview-prep/*`, `batch/tracker-additions/*`
-- **System Layer (auto-updatable; DON'T put user data here):** `modes/_shared.md` and all other modes, `AGENTS.md`, `CLAUDE.md`, `CODEX.md`, `OPENCODE.md`, `KIMI.md`, `GEMINI.md`, `*.mjs` scripts, `dashboard/*`, `templates/*`, `batch/*` (except `batch/tracker-additions/`)
+- **User Layer (NEVER auto-updated; personalization goes HERE):** `cv.md`, `config/profile.yml`, `config/cv-facts.json`, `modes/_profile.md`, `modes/_custom.md`, `modes/_brief.md`, `voice-dna.md`, `writing-samples/*`, `article-digest.md`, `portals.yml`, `data/*`, `documents/*`, `jds/*`, `reports/*`, `output/*`, `interview-prep/*`, `batch/tracker-additions/*`
+- **System Layer (auto-updatable; DON'T put user data here):** `modes/_shared.md` and every other file in `modes/` except the three user files above, `AGENTS.md`, `CLAUDE.md`, `CODEX.md`, `OPENCODE.md`, `KIMI.md`, `GEMINI.md`, `*.mjs` scripts, `dashboard/*`, `templates/*`, `batch/*` (except `batch/tracker-additions/`)
 
 **THE RULE: When the user asks to customize facts or targeting (archetypes, narrative, negotiation scripts, proof points, location policy, comp targets), ALWAYS write to `modes/_profile.md` or `config/profile.yml`. When they ask for procedural house rules, custom workflows, output preferences, or automations, write to `modes/_custom.md` (copy it from `modes/_custom.template.md` if missing). NEVER edit `modes/_shared.md` for user-specific content.** This ensures system updates don't overwrite their customizations.
 
