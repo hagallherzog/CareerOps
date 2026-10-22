@@ -538,6 +538,7 @@ const SYSTEM_PATHS = [
   'batch/batch-runner.sh',
   'batch/company-scope.mjs',
   'batch/jd-rescue.mjs',
+  'batch/prefilter-url.mjs',
   'batch/aggregate-tokens.mjs',
   'batch/README.md',
   'utils/token-tracker.mjs',
