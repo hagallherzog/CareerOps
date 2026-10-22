@@ -106,7 +106,7 @@ Root scripts such as `doctor.mjs` run from the checkout that holds `web/`, not
 from `CAREER_OPS_ROOT`; set `CAREER_OPS_CODE_ROOT` when the app runs outside it.
 
 Every route but build assets is gated by the same-origin + loopback guard in
-`src/lib/origin-guard.mjs`. Two opt-ins widen it, both unset by default and both in `web/.env.local`:
+`src/lib/origin-guard.mjs`. Two opt-ins widen it, both unset by default:
 `CAREER_OPS_WEB_ALLOWED_HOSTS` names extra non-loopback hosts the dashboard may
 answer on, and `CAREER_OPS_ALLOWED_ORIGINS` names origins allowed to call the
 API from outside the app — a comma- or space-separated list, no trailing slash.
@@ -114,6 +114,12 @@ The second is what a local companion client needs: a browser extension calls
 from a `chrome-extension://` origin, which Fetch Metadata always reports as
 `cross-site`, so the guard refuses it unless the id is named here. The host
 layer still applies to an allowlisted origin.
+
+`CAREER_OPS_ALLOWED_ORIGINS` can live in `web/.env.local`.
+`CAREER_OPS_WEB_ALLOWED_HOSTS` cannot: it also picks the bind address, which the
+launcher (`server.mjs`, or `npm run ui` from the repository root) reads from the
+shell environment before Next.js loads `web/.env.local`
+(see [below](#exposing-it-beyond-this-machine)).
 
 Pass one-off flags through npm's `--`: `npm run dev -- -p 4000`.
 
@@ -127,6 +133,11 @@ loopback and the hosts you named:
 ```bash
 CAREER_OPS_WEB_ALLOWED_HOSTS="192.168.1.50" npm run dev
 ```
+
+Set it in the environment of `npm run dev`, `npm start` or `npm run ui`, as above
+or with `export`. The launcher chooses the bind before Next.js reads `web/.env.local`, so
+a value written only there reaches the guard but not the bind: the server stays on
+`127.0.0.1` and the startup line says `loopback only`.
 
 It is not an on/off switch, and it is not read as one: `off`, `false`, `no` and
 `0` are all valid hostnames, so treating them as words would have opened the
