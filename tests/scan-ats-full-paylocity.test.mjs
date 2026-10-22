@@ -17,6 +17,13 @@ else fail(`SOURCES.paylocity.provider is ${JSON.stringify(source?.provider?.id)}
 if (source?.dataset?.endsWith('/paylocity_companies_clean.json')) pass('paylocity source reads paylocity_companies_clean.json');
 else fail(`SOURCES.paylocity.dataset is ${JSON.stringify(source?.dataset)}`);
 
+// Paylocity throttles well below the other single-host directories.
+if (source?.singleHost === true && source.concurrency > 0 && source.concurrency < SOURCES.greenhouse.concurrency) {
+  pass(`paylocity source runs unscoped at a lower concurrency (${source.concurrency}) than greenhouse (${SOURCES.greenhouse.concurrency})`);
+} else {
+  fail(`paylocity concurrency=${source?.concurrency} singleHost=${source?.singleHost}, greenhouse concurrency=${SOURCES.greenhouse?.concurrency}`);
+}
+
 {
   const e = source.toEntry({ guid: GUID, name: 'ExampleCo', jobs: 3 });
   if (e?.careers_url === BOARD && e.name === 'ExampleCo') pass('a dataset row becomes the canonical board URL with the dataset name');

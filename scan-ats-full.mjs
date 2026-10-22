@@ -103,16 +103,20 @@ const DATASET_BASE = 'https://raw.githubusercontent.com/Feashliaa/job-board-aggr
 // 20 different servers and the resolver, not any one vendor, is the limit.
 const CONCURRENCY = 20;
 
-// Greenhouse, Lever, Ashby and Paylocity each serve their ENTIRE directory from
-// a single hostname (boards-api.greenhouse.io, api.lever.co, api.ashbyhq.com,
-// recruiting.paylocity.com), so the default is 20 sustained connections to ONE
-// host across thousands of boards.
+// Greenhouse, Lever and Ashby each serve their ENTIRE directory from a single
+// hostname (boards-api.greenhouse.io, api.lever.co, api.ashbyhq.com), so the
+// default is 20 sustained connections to ONE API across thousands of boards.
 // That earns an HTTP throttle, and a throttled sweep loses live boards rather
 // than failing loudly: two full sweeps an hour apart saw lever's unreachable
 // count go 2,436 -> 4,100 and ashby's 683 -> 1,675, then recover to 2,525 / 684
 // after a cooldown with no change to the dataset. The boards were never dead —
 // they were refused, and the matches on them were silently missed.
 const SINGLE_HOST_CONCURRENCY = 6;
+// recruiting.paylocity.com is also one host for every board, but throttles far
+// earlier: at SINGLE_HOST_CONCURRENCY a full sweep got HTTP 429 on 9,052 of
+// 10,252 boards. The provider retries a 429 with backoff; this keeps the sweep
+// from provoking one on nearly every board.
+const PAYLOCITY_CONCURRENCY = 2;
 // A refusing resolver fails every lookup in milliseconds, so a sweep that
 // keeps going just feeds it (#2229). Stop after this many consecutive
 // resolver-level failures — high enough that a handful of unlucky boards
@@ -371,8 +375,8 @@ export const SOURCES = {
   },
   paylocity: {
     provider: paylocity,
-    // Whole directory behind one host — see SINGLE_HOST_CONCURRENCY.
-    concurrency: SINGLE_HOST_CONCURRENCY,
+    // Whole directory behind one host that throttles early — see PAYLOCITY_CONCURRENCY.
+    concurrency: PAYLOCITY_CONCURRENCY,
     // One host means one keep-alive pool, so per-board connection scopes would
     // only add a TLS handshake per board (see boardScope below).
     singleHost: true,
