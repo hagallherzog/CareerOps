@@ -5,7 +5,7 @@
  * Returns the same shape as classifyLiveness: { result, reason }.
  */
 
-import { classifyLiveness } from './liveness-core.mjs';
+import { classifyLiveness, jobIdToken } from './liveness-core.mjs';
 import { BROWSER_LIKE_USER_AGENT } from './user-agent.mjs';
 
 const NAVIGATE_TIMEOUT_MS = 15_000;
@@ -483,7 +483,30 @@ export async function checkUrlLiveness(page, url, { extraSettleMs = 0, timeoutRe
     // interstitial needs a moment to clear before the first read.
     if (extraSettleMs > 0) await page.waitForTimeout(extraSettleMs);
 
-    const extractApplyControls = () => {
+    const extractApplyControls = (postingId) => {
+      // Page chrome (nav, header, footer) is skipped because its links are the
+      // site's own: Jobs, Careers, Sign in. A link to this posting's own page is
+      // not chrome, wherever it sits. Tech in Asia puts its only Apply control,
+      // "APPLY FOR JOB" -> /jobs/<id>/apply, in the page header: measured
+      // 2026-10-22, 20 of 20 live postings read no_apply_control without this,
+      // and 40 of 40 closed ones answer "Job not found" with no such link. Only
+      // the path counts, so a sign-in link that carries the posting in its
+      // return address (?returnUrl=/jobs/<id>) is still chrome, and so is a
+      // link back into this page, such as a skip link to #main-content.
+      const linksToPosting = (element) => {
+        const href = postingId && element.getAttribute('href');
+        if (!href) return false;
+        try {
+          const target = new URL(href, document.baseURI);
+          target.hash = '';
+          const here = new URL(location.href);
+          here.hash = '';
+          return target.href !== here.href && target.pathname.toLowerCase().includes(postingId);
+        } catch {
+          return false;
+        }
+      };
+
       // A design-system button is a custom element: UKG Pro (UltiPro) renders
       // Apply as <ukg-button>Apply now</ukg-button>, with no role on it. The
       // native <button> inside its shadow root has no text of its own (the
@@ -497,7 +520,7 @@ export async function checkUrlLiveness(page, url, { extraSettleMs = 0, timeoutRe
 
       return candidates
         .filter((element) => {
-          if (element.closest('nav, header, footer')) return false;
+          if (element.closest('nav, header, footer') && !linksToPosting(element)) return false;
           if (element.closest('[aria-hidden="true"]')) return false;
 
           const style = window.getComputedStyle(element);
@@ -541,6 +564,8 @@ export async function checkUrlLiveness(page, url, { extraSettleMs = 0, timeoutRe
             }
           });
 
+    const postingId = jobIdToken(url);
+
     // One reading of the page: the top-level document plus every same-origin
     // child frame, so a posting rendered inside a frame and one rendered inline
     // are judged the same way. A top-level read that throws propagates; a frame
@@ -548,12 +573,12 @@ export async function checkUrlLiveness(page, url, { extraSettleMs = 0, timeoutRe
     const readPage = async () => {
       const finalUrl = page.url();
       let bodyText = await page.evaluate(() => document.body?.innerText ?? '');
-      let applyControls = await page.evaluate(extractApplyControls);
+      let applyControls = await page.evaluate(extractApplyControls, postingId);
       for (const frame of childFrames(finalUrl)) {
         try {
           const text = await frame.evaluate(() => document.body?.innerText ?? '');
           if (text && text.trim()) bodyText += '\n' + text;
-          applyControls = applyControls.concat(await frame.evaluate(extractApplyControls));
+          applyControls = applyControls.concat(await frame.evaluate(extractApplyControls, postingId));
         } catch {
           // detached or cross-origin mid-read; the rest of the reading still stands
         }
