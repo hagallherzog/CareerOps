@@ -860,6 +860,8 @@ const scripts = [
   { name: 'company-funded.mjs --self-test', expectExit: 0 },
   { name: 'invite-match.mjs --self-test', expectExit: 0 },
   { name: 'tracker-sync-check.mjs --self-test', expectExit: 0 },
+  { name: 'linkedin-join.mjs --self-test', expectExit: 0 },
+  { name: 'validate-profile.mjs --self-test', expectExit: 0 },
   { name: 'updater-migration-tests.mjs', expectExit: 0 },
   { name: 'validate-portals.mjs --file templates/portals.example.yml', expectExit: 0 },
   { name: 'validate-system-paths-coverage.mjs --self-test', expectExit: 0 },
