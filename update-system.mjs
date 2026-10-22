@@ -308,6 +308,7 @@ const SYSTEM_PATHS = [
   'lib/failure-excerpt.mjs',
   'lib/gemini-node-floor.mjs',
   'lib/node-floor.mjs',
+  'lib/chromium-launch-error.mjs',
   'lib/local-today.mjs',
   'lib/parse-date.mjs',
   'lib/personalization.mjs',
