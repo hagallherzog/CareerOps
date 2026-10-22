@@ -45,6 +45,12 @@ if (source?.singleHost === true && source.concurrency > 0 && source.concurrency 
 }
 
 {
+  const e = source.toEntry({ guid: GUID, name: 'A &amp; B Widgets &#39;West&#39;' });
+  if (e?.name === "A & B Widgets 'West'") pass('HTML entities in the dataset name are decoded');
+  else fail(`entity-escaped name: ${JSON.stringify(e?.name)}`);
+}
+
+{
   const e = source.toEntry({ guid: GUID });
   if (e?.careers_url === BOARD && e.name === '') pass('a row without a name keeps an empty name (provider falls back to the board title)');
   else fail(`nameless row: ${JSON.stringify(e)}`);

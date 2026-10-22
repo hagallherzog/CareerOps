@@ -65,6 +65,7 @@ import workday, { WORKDAY_TRUNCATED_REASON } from './providers/workday.mjs';
 import icims from './providers/icims.mjs';
 import bamboohr from './providers/bamboohr.mjs';
 import paylocity, { boardUrl as paylocityBoardUrl } from './providers/paylocity.mjs';
+import { decodeEntities } from './providers/_html-entities.mjs';
 import { buildTitleFilter, buildTitleFilterOverrides, buildTitleFilterWithOverrides, buildLocationFilter, buildContentFilter, matchedTitleKeywords, loadSeenUrls, normalizeUrlForDedup, appendToPipeline, appendToScanHistory, findBlacklistEntry, loadBlacklist, parseSinceDays, PORTALS_PATH, PIPELINE_PATH, SCAN_HISTORY_PATH } from './scan.mjs';
 import { localToday } from './lib/local-today.mjs';
 import { printScanSummaryHeader } from './lib/scan-summary-marker.mjs';
@@ -288,12 +289,14 @@ export function icimsHostCandidates(slug) {
   return s.includes('careers') ? [asIs, prefixed] : [prefixed, asIs];
 }
 
-// A Paylocity dataset row is a board GUID plus the company name. An empty name
-// is kept empty: the provider then names the company from the board's own title.
+// A Paylocity dataset row is a board GUID plus the company name. The dataset
+// stores names HTML-escaped ("A &amp; B"), so they are decoded here. An empty
+// name is kept empty: the provider then names the company from the board's
+// own title.
 export function paylocityEntry(row) {
   const careersUrl = paylocityBoardUrl(row?.guid);
   if (!careersUrl) return null;
-  const name = typeof row.name === 'string' ? row.name.trim() : '';
+  const name = typeof row.name === 'string' ? decodeEntities(row.name).trim() : '';
   return entryOnHost(name, careersUrl, h => h === 'recruiting.paylocity.com');
 }
 
