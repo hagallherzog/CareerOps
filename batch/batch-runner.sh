@@ -10,6 +10,7 @@ set -euo pipefail
 #   opencode  — opencode run (falls back to ollama launch opencode if not in PATH)
 #   gemini    — gemini -p
 #   qwen      — qwen -p
+#   grok      — grok -p with --always-approve
 #
 # Only claude supports --strict-mcp-config, the rate-limit/session retry loop,
 # and --parallel > 1; other CLIs run sequentially with a single attempt.

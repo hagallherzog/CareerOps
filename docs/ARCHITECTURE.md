@@ -69,7 +69,7 @@ batch-input.tsv    →  batch-runner.sh  →  N × headless CLI workers
                     (tracks progress)
 ```
 
-Each worker is a headless AI CLI instance — the bundled `batch-runner.sh` currently runs `claude -p` workers only. See the Headless / Batch Mode table in `AGENTS.md`. Workers produce:
+Each worker is a headless AI CLI instance. The bundled `batch-runner.sh` runs `claude -p` workers by default; `--cli opencode`, `--cli gemini`, `--cli qwen` or `--cli grok` selects another CLI. Only `claude` workers run in parallel (`--parallel`, default 3) and retry on rate limits; the other CLIs run one offer at a time, with a single attempt per run (a later run still retries a failed offer, up to `--max-retries`). The Headless / Batch Mode table in `AGENTS.md` lists every CLI's headless command, including CLIs the runner does not launch. Workers produce:
 - Report .md
 - PDF
 - Tracker TSV line

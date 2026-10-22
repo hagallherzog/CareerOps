@@ -90,6 +90,7 @@ batch/batch-runner.sh [OPTIONS]
 ```
 
 Seçenekler (Options):
+- `--cli NAME` — çalışan (worker) CLI'ı: `claude` (varsayılan), `opencode`, `gemini`, `qwen` veya `grok`; `claude` dışındaki her CLI işleri tek tek ve her çalıştırmada tek denemeyle çalıştırır (sonraki bir çalıştırma başarısız bir işi `--max-retries` sınırına kadar yine yeniden dener)
 - `--dry-run` — bekleyen işleri çalıştırmadan listele
 - `--retry-failed` — sadece başarısız olan işleri yeniden dene
 - `--resume-paused` — Claude oturumu/kullanım sınırı aşıldığı için duraklatılan işlere devam et

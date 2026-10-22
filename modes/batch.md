@@ -100,6 +100,7 @@ batch/batch-runner.sh [OPTIONS]
 ```
 
 Options:
+- `--cli NAME` — worker CLI: `claude` (default), `opencode`, `gemini`, `qwen` or `grok`; every CLI except `claude` runs one job at a time, with a single attempt per run (a later run still retries a failed job, up to `--max-retries`)
 - `--dry-run` — list pending jobs without executing
 - `--retry-failed` — retry only failed jobs
 - `--resume-paused` — resume jobs paused after a Claude session/rate limit
