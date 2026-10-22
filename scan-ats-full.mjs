@@ -56,7 +56,7 @@ import { loadYaml } from './lib/yaml-document.mjs';
 import { renameSyncWithRetry } from './tracker-utils.mjs';
 
 import { makeHttpCtx, fetchJson } from './providers/_http.mjs';
-import { withConnectionScope } from './providers/_connection-scope.mjs';
+import { withConnectionScope, withAbortScope } from './providers/_connection-scope.mjs';
 import { isResolverFailure, dnsPacingStats } from './providers/_dns-cache.mjs';
 import greenhouse from './providers/greenhouse.mjs';
 import lever from './providers/lever.mjs';
@@ -932,7 +932,12 @@ export async function runHistorySeedScan(seeds, providers, opts, ctx, processJob
     const hostKey = (() => {
       try { return new URL(entry.careers_url).hostname.toLowerCase(); } catch { return seed.vendor; }
     })();
-    await withHostSlot(hostKey, () => withConnectionScope(async () => {
+    await withHostSlot(hostKey, () => {
+      // Give the history board its own abort signal so a timed-out board's
+      // in-flight requests stop (#5570). The operation.active flag below only
+      // gates work BETWEEN fetches; it can't stop the fetch already in flight.
+      const controller = new AbortController();
+      return withConnectionScope(async () => {
       if (quarantinedHosts.has(hostKey)) {
         errors++;
         if (opts.verbose) console.error(`  ✗ ${seed.vendor}-history/${entry.name}: host skipped after an earlier timeout`);
@@ -949,6 +954,7 @@ export async function runHistorySeedScan(seeds, providers, opts, ctx, processJob
         await withTimeout(operationPromise, timeoutMs, `${seed.vendor}-history/${entry.name}`, () => {
           timedOut = true;
           operation.active = false;
+          controller.abort();
         });
       } catch (err) {
         operation.active = false;
@@ -961,7 +967,8 @@ export async function runHistorySeedScan(seeds, providers, opts, ctx, processJob
         // quarantining prevents queued work from replacing it.
         operationPromise.catch(() => {});
       }
-    }));
+      }, { signal: controller.signal });
+    });
   });
 
   return {
@@ -985,8 +992,23 @@ const COMPANY_TIMEOUT_MS = 5 * 60_000;
 // idle socket per tenant for the rest of the run, and a full sweep exhausts
 // local connection capacity partway through (see providers/_connection-scope.mjs).
 // Single-host sources share one pool already and run unscoped.
-function boardScope(source, fn) {
-  return source.singleHost ? fn() : withConnectionScope(fn);
+// The watchdog races the board's work against a timer, and on timeout it
+// aborts the board's AbortController. That signal rides in the connection/abort
+// scope, so every request the board issues folds it into its own timeout: a
+// timed-out board stops issuing requests and retries at once (#5570), instead
+// of paginating on in the background until it finishes on its own — which kept
+// the process alive minutes past its own summary and burned a 4-attempt retry
+// on every abandoned request.
+export function boardScope(source, label, timeoutMs, fn) {
+  const controller = new AbortController();
+  // The signal is handed to `fn` as well as carried in the scope, so a caller
+  // can tell a timed-out board from a failed one and skip any post-timeout
+  // fallback work (e.g. processing a deferred board's partial page outside the
+  // scope, where it would run uncancelled, #5570).
+  const run = () => withTimeout(fn(controller.signal), timeoutMs, label, () => controller.abort());
+  return source.singleHost
+    ? withAbortScope(controller.signal, run)
+    : withConnectionScope(run, { signal: controller.signal });
 }
 
 export function createKeyedLimiter(limit) {
@@ -1469,7 +1491,7 @@ async function main() {
         // The whole per-company unit — fetch AND processJobs (which may issue
         // per-job detail-page requests via provider.enrichDate) — runs inside
         // one watchdog, so enrichment latency can't blow past COMPANY_TIMEOUT_MS.
-        await boardScope(source, () => withTimeout((async () => {
+        await boardScope(source, `${name}/${entry.name}`, COMPANY_TIMEOUT_MS, async () => {
           // Most boards in a public directory hold nothing the title filter
           // wants; where the provider can list a board cheaply, find that out
           // before downloading every posting body.
@@ -1519,7 +1541,7 @@ async function main() {
           }
           if (jobs.workdayNoDateSkip) { noDateSkipCompanies++; noDateSkipJobs += jobs.length; }
           await processJobs(jobs, name, source.provider, entry.name);
-        })(), COMPANY_TIMEOUT_MS, `${name}/${entry.name}`));
+        });
       } catch (err) {
         // Mostly defunct boards in the public dataset — expected noise, so the
         // default stays quiet; --verbose surfaces per-board failures.
@@ -1581,8 +1603,10 @@ async function main() {
     if (truncated.length && !resolverOutage) {
       log(`\n  ↻ retrying ${truncated.length} truncated board(s) sequentially...`);
       for (const entry of truncated) {
+        let retrySignal;
         try {
-          await boardScope(source, () => withTimeout((async () => {
+          await boardScope(source, `${name}/${entry.name} (retry)`, COMPANY_TIMEOUT_MS, async (signal) => {
+            retrySignal = signal;
             const jobs = await source.provider.fetch(entry, ctx);
             recordBoardResult(deadBoards, name, boardKey(entry), 200);
             // Where a board deferred by the parallel sweep is actually decided.
@@ -1607,7 +1631,7 @@ async function main() {
                 console.error(`  ✗ ${name}/${entry.name}: ${why} after sequential retry`);
               }
             }
-          })(), COMPANY_TIMEOUT_MS, `${name}/${entry.name} (retry)`));
+          });
         } catch (err) {
           errors++;
           recordBoardFailure(deadBoards, name, boardKey(entry), err);
@@ -1616,8 +1640,11 @@ async function main() {
           // admitted ungated, the fallback the retry takes for a board that
           // comes back truncated again. Without it, a title match already in
           // hand would be lost to the retry's failure.
+          // Skip the fallback when the retry timed out: processJobs() can issue
+          // enrichDate detail fetches, and here it would run outside boardScope,
+          // uncancelled — the post-timeout work this fix exists to stop (#5570).
           const partial = deferred.get(entry)?.jobs;
-          if (partial) await processJobs(partial, name, source.provider, entry.name);
+          if (partial && !retrySignal?.aborted) await processJobs(partial, name, source.provider, entry.name);
         }
       }
     }
@@ -1843,8 +1870,24 @@ async function main() {
 
 // Only run main() when invoked directly, not when imported by tests.
 if (isMainModule(import.meta.url)) {
-  main().catch(err => {
-    console.error('Fatal:', err.message);
-    process.exit(1);
-  });
+  // Exit explicitly once main() returns. The watchdog now cancels a timed-out
+  // board's work, but a keep-alive socket a single-host pool still holds (or a
+  // request aborting just as the summary prints) can otherwise keep the event
+  // loop open for minutes past the summary (#5570). Flush stdout first so a
+  // piped summary is never truncated.
+  const flushAndExit = (code) => {
+    // Exit from a write-completion callback, queued after whatever is already
+    // buffered, so a piped summary flushes first. `writableLength > 0` is not a
+    // reliable "wait for drain" signal — `drain` only fires for a write that
+    // returned false (past the high-water mark), so bytes queued below it would
+    // never drain and the process would hang (the opposite of the intent).
+    process.exitCode = code;
+    process.stdout.write('', () => process.exit(code));
+  };
+  main()
+    .then(() => flushAndExit(0))
+    .catch(err => {
+      console.error('Fatal:', err.message);
+      flushAndExit(1);
+    });
 }
