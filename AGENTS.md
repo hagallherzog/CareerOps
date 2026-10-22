@@ -459,7 +459,7 @@ A single-string `modes_dir` (today's default, ~90% of users) behaves exactly as 
 | Maintains their own hand-tuned `.tex` CV and wants it tailored in place (opt-in; cv.md stays the default) | `latex-tex` |
 | Wants a tailored CV as markdown instead of a PDF (to paste into their own template or editor) | `text` |
 | Wants a cover letter | `cover` |
-| Wants to add a role to the tracker manually | `add` |
+| Wants to add a role to the tracker by hand, without an evaluation | `tracker` — a tracker-addition TSV with the `N/A` score sentinel, merged by `merge-tracker.mjs` |
 | Wants to discover CV competencies they forgot to write down | `expand` |
 | Evaluates a course/cert | `training` |
 | Evaluates portfolio project | `project` |
