@@ -537,6 +537,7 @@ const SYSTEM_PATHS = [
   'batch/batch-prompt.md',
   'batch/batch-runner.sh',
   'batch/company-scope.mjs',
+  'batch/sync-pipeline-to-input.mjs',
   'batch/jd-rescue.mjs',
   'batch/aggregate-tokens.mjs',
   'batch/README.md',
