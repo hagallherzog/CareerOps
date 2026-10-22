@@ -483,7 +483,7 @@ Provide a score table:
 | Red flags | -X if any |
 | **Global** | **X.X/5** |
 
-Decide the Global Score once as the holistic judgment across these dimensions, applying any `modes/_custom.md` Scoring Rules. Do not average report blocks A–H. Copy the same value into the report header, Machine Summary `score`, and tracker addition; do not recalculate it at each write.
+Decide the Global Score once as the holistic judgment across these dimensions, applying the user's scoring rules from `modes/_profile.md` and `modes/_custom.md`. Do not average report blocks A–H. Copy the same value into the report header, Machine Summary `score`, and tracker addition; do not recalculate it at each write.
 
 #### Score Evidence
 
