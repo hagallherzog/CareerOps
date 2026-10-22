@@ -967,7 +967,7 @@ the sweep, or delete the checkpoint to start fresh.
 
 ### DNS pacing
 
-A full sweep resolves one hostname per Workday, iCIMS and BambooHR tenant — 25,205 distinct hostnames across the current datasets (3,781 Workday + 10,108 iCIMS + 11,316 BambooHR), against 4 for Greenhouse, Lever, Ashby and Paylocity combined. Those lookups are irreducible (nothing to cache: every hostname is distinct), and issued unpaced they trip the per-client rate limit on a resolver like Pi-hole, which then refuses queries for the whole machine — the scan reports thousands of misleading `fetch failed` lines while the boards themselves are fine (#2229).
+A full sweep resolves one hostname per Workday, iCIMS and BambooHR tenant — 25,205 distinct hostnames across the current datasets (3,781 Workday + 10,108 iCIMS + 11,316 BambooHR). Greenhouse, Lever, Ashby and Paylocity serve every board from a single hostname each, so they add only 4 more. Those per-tenant lookups are irreducible (nothing to cache: every hostname is distinct), and issued unpaced they trip the per-client rate limit on a resolver like Pi-hole, which then refuses queries for the whole machine — the scan reports thousands of misleading `fetch failed` lines while the boards themselves are fine (#2229).
 
 Uncached, non-coalesced lookups are therefore paced at **400 per minute** by default. The token is spent *before* `dns.lookup()` runs, so a name answered locally — from `/etc/hosts`, say — still costs one; the ceiling meters what the process asks to resolve, not what leaves the machine.
 
