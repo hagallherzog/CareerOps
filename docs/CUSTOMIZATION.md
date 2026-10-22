@@ -47,12 +47,14 @@ The HTML template uses these design tokens:
 
 To customize fonts/colors, edit the CSS in the template. Update font files in `fonts/` if switching fonts.
 
-## Negotiation Scripts (modes/_shared.md)
+## Negotiation Scripts (modes/_profile.md)
 
-The negotiation section provides frameworks for salary discussions. Replace the example scripts with your own:
-- Target ranges
-- Geographic arbitrage strategy
-- Pushback responses
+Your negotiation scripts live under "Your Negotiation Scripts" in `modes/_profile.md`, which onboarding copies from `modes/_profile.template.md` and updates never touch. Replace the example scripts with your own:
+- Salary expectations (the range itself comes from `compensation` in `config/profile.yml`)
+- Geographic discount pushback
+- Responses to an offer below target
+
+Comp research guidance sits just above them, under "Your Comp Targets". Don't put these in `modes/_shared.md`: it is a system file, and an update replaces it.
 
 ## Hooks (Optional)
 
