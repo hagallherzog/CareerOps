@@ -357,10 +357,10 @@ If the user accepts, use the `/loop` or `/schedule` skill (if available) to set 
 This system is designed to be customized by YOU (AI Agent). When the user asks, edit directly:
 
 - Archetypes / targeting → `modes/_profile.md` or `config/profile.yml`
-- Translate modes → files in `modes/`
+- Output language → `language.output` in `config/profile.yml`; market vocabulary → `language.modes_dir` (see Output Language vs Market Modes). A mode set for a new language is a contribution under `modes/{lang}/`, not a personalization: the files in `modes/` are system files, and an update overwrites edits to them
 - Add companies → `portals.yml`
 - Profile details → `config/profile.yml`
-- CV template design → `templates/cv-template.html`
+- CV template design → a copy of `templates/cv-template.html` saved as `templates/cv-template.{name}.html`, selected with `cv.template: {name}` in `config/profile.yml`. Never edit `templates/cv-template.html` itself: it is a system file and the next update replaces it
 - Scoring weights → `modes/_profile.md` for the user; `modes/_shared.md` + `batch/batch-prompt.md` only when changing shared defaults for everyone
 
 ### Language Modes
