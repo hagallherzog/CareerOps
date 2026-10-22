@@ -103,9 +103,10 @@ const DATASET_BASE = 'https://raw.githubusercontent.com/Feashliaa/job-board-aggr
 // 20 different servers and the resolver, not any one vendor, is the limit.
 const CONCURRENCY = 20;
 
-// Greenhouse, Lever and Ashby each serve their ENTIRE directory from a single
-// hostname (boards-api.greenhouse.io, api.lever.co, api.ashbyhq.com), so the
-// default is 20 sustained connections to ONE API across thousands of boards.
+// Greenhouse, Lever, Ashby and Paylocity each serve their ENTIRE directory from
+// a single hostname (boards-api.greenhouse.io, api.lever.co, api.ashbyhq.com,
+// recruiting.paylocity.com), so the default is 20 sustained connections to ONE
+// host across thousands of boards.
 // That earns an HTTP throttle, and a throttled sweep loses live boards rather
 // than failing loudly: two full sweeps an hour apart saw lever's unreachable
 // count go 2,436 -> 4,100 and ashby's 683 -> 1,675, then recover to 2,525 / 684
