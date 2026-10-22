@@ -197,10 +197,14 @@ try {
     }
   }
 
-  // A redirect to JobNotFound is a dead board: synthetic 404 for dead-boards.mjs.
+  // A redirect to JobNotFound is a dead board: synthetic 404 for dead-boards.mjs,
+  // after exactly one request (a redirect is not retried).
   for (const location of ['/Recruiting/Jobs/JobNotFound', 'https://recruiting.paylocity.com/Recruiting/Jobs/JobNotFound']) {
+    let calls = 0;
     const ctx = {
+      sleep: async () => {},
       fetchText: async () => {
+        calls++;
         const err = new Error('HTTP 302 Found');
         err.status = 302;
         err.location = location;
@@ -211,8 +215,52 @@ try {
       await paylocity.fetch({ name: 'ExampleCo', careers_url: BOARD }, ctx);
       fail('paylocity.fetch() should throw on a JobNotFound redirect');
     } catch (e) {
-      if (e.status === 404 && /no such board/.test(e.message)) pass(`paylocity.fetch() maps a 302 to ${location} to a 404`);
-      else fail(`paylocity.fetch() JobNotFound redirect gave status=${e.status} "${e.message}"`);
+      if (e.status === 404 && /no such board/.test(e.message) && calls === 1) {
+        pass(`paylocity.fetch() maps a 302 to ${location} to a 404 without retrying`);
+      } else {
+        fail(`paylocity.fetch() JobNotFound redirect gave status=${e.status} "${e.message}" after ${calls} call(s)`);
+      }
+    }
+  }
+
+  // A 429 is retried, and the board comes back once the throttle clears.
+  {
+    const calls = [];
+    const sleeps = [];
+    const ctx = {
+      sleep: async (ms) => { sleeps.push(ms); },
+      fetchText: async (url, opts) => {
+        calls.push(opts);
+        if (calls.length < 3) {
+          const err = new Error('HTTP 429 Too Many Requests');
+          err.status = 429;
+          err.retryAfter = calls.length === 1 ? '5' : null;
+          throw err;
+        }
+        return page(SAMPLE);
+      },
+    };
+    const jobs = await paylocity.fetch({ name: 'ExampleCo', careers_url: BOARD }, ctx);
+    if (jobs.length === 3 && calls.length === 3) pass('paylocity.fetch() retries a 429 and returns the board once it answers');
+    else fail(`paylocity.fetch() after 429s: ${jobs.length} jobs, ${calls.length} calls`);
+    if (sleeps[0] === 5_000) pass('paylocity.fetch() waits for the Retry-After a 429 carries');
+    else fail(`paylocity.fetch() first wait was ${sleeps[0]} ms, expected 5000`);
+    if (calls.every(o => o?.redirect === 'manual')) pass('paylocity.fetch() passes redirect:manual on every attempt');
+    else fail(`paylocity.fetch() retry redirect opts were ${JSON.stringify(calls.map(o => o?.redirect))}`);
+  }
+
+  // A throttle that never clears ends in the 429 itself, not in a dead-board 404.
+  {
+    let calls = 0;
+    const throttled = new Error('HTTP 429 Too Many Requests');
+    throttled.status = 429;
+    const ctx = { sleep: async () => {}, fetchText: async () => { calls++; throw throttled; } };
+    try {
+      await paylocity.fetch({ name: 'ExampleCo', careers_url: BOARD }, ctx);
+      fail('paylocity.fetch() should throw when every attempt is throttled');
+    } catch (e) {
+      if (e === throttled && e.status === 429 && calls === 4) pass('paylocity.fetch() gives up after 4 throttled attempts and rethrows the 429');
+      else fail(`paylocity.fetch() persistent 429 gave status=${e.status} after ${calls} call(s)`);
     }
   }
 
@@ -224,7 +272,7 @@ try {
     const original = new Error(`HTTP ${status}`);
     original.status = status;
     original.location = location;
-    const ctx = { fetchText: async () => { throw original; } };
+    const ctx = { sleep: async () => {}, fetchText: async () => { throw original; } };
     try {
       await paylocity.fetch({ name: 'ExampleCo', careers_url: BOARD }, ctx);
       fail(`paylocity.fetch() should throw on ${label}`);

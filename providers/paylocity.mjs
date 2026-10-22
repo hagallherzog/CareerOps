@@ -1,6 +1,7 @@
 // @ts-check
 /** @typedef {import('./_types.js').Provider} Provider */
 
+import { fetchTextWithRetry } from './_http.mjs';
 import { safeEncodeURIComponent } from './_safe-url.mjs';
 
 // Paylocity provider — single-company ATS adapter for `tracked_companies:`.
@@ -45,6 +46,11 @@ const NOT_FOUND_PATH_RE = /^(?:https:\/\/recruiting\.paylocity\.com)?\/recruitin
 // The biggest observed board (2,000+ postings) took ~5 s; the shared 10 s
 // default leaves too little headroom on a slow day.
 const TIMEOUT_MS = 30_000;
+// recruiting.paylocity.com serves every tenant's board and answers 429 once a
+// client sends requests faster than a few per second. The shared retry honours
+// a Retry-After header (up to maxDelayMs * 4) and otherwise backs off
+// exponentially; a 302 is not retried.
+const RETRY_POLICY = { retries: 3, baseDelayMs: 2_000, maxDelayMs: 15_000 };
 
 /**
  * Canonical board URL for a board GUID, or null when the value is not a GUID.
@@ -168,7 +174,7 @@ export default {
     if (!url) throw new Error(`paylocity: cannot derive board URL for ${entry?.name}`);
     let html;
     try {
-      html = await ctx.fetchText(url, { redirect: 'manual', timeoutMs: TIMEOUT_MS });
+      html = await fetchTextWithRetry(ctx, url, { redirect: 'manual', timeoutMs: TIMEOUT_MS }, RETRY_POLICY);
     } catch (err) {
       if (typeof err?.status === 'number' && err.status >= 300 && err.status < 400
         && NOT_FOUND_PATH_RE.test(String(err.location || ''))) {
