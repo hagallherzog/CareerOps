@@ -31,3 +31,16 @@ test('Assessment recovery proves a reply but never an interview', () => {
   const ledger = parseStatusLogStages('2\t2026-10-01\tAssessment\tDiscarded');
   assert.deepEqual([...recoverFunnelStages(statuses, ledger)], [[1, 3], [2, 3]]);
 });
+
+test('a retracted transition proves no stage, and neither does the revert that follows it', () => {
+  const statuses = new Map([[1, 'Applied'], [2, 'Rejected']]);
+  const ledger = parseStatusLogStages([
+    '1\t2026-10-01\tEvaluated\tApplied\tset-status\t',
+    '1\t2026-10-02\tApplied\tOffer\tset-status\t',
+    '1\t2026-10-02\t-\t-\tmanual\tmis-click',
+    '1\t2026-10-02\tOffer\tApplied\tset-status\t',
+    '2\t2026-10-01\tApplied\tInterview\tset-status\t',
+    '2\t2026-10-05\tInterview\tRejected\tset-status\t',
+  ].join('\n'));
+  assert.deepEqual([...recoverFunnelStages(statuses, ledger)], [[1, 1], [2, 4]]);
+});

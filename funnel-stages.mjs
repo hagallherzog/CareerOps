@@ -9,15 +9,30 @@ export function funnelStageRank(status) {
   return RANKS.get(String(status ?? '').trim().toUpperCase()) || 0;
 }
 
-/** Parse {num}\t{date}\t{from}\t{to} observations, ignoring torn rows. */
+/** Parse {num}\t{date}\t{from}\t{to} observations, ignoring torn rows.
+ * A `to` of `-` retracts the row's latest observation, as foldObservations() in
+ * funnel-velocity.mjs reads it. The next line's `from` restates the retracted
+ * stage, so it proves nothing either.
+ */
 export function parseStatusLogStages(content) {
-  const out = [];
+  const byNum = new Map();
+  const retracted = new Map();
   for (const line of String(content ?? '').replace(/\r/g, '').split('\n')) {
     const [rawNum, date, from, to] = line.split('\t').map(s => s.trim());
     if (!/^\d+$/.test(rawNum || '') || !date || !from || !to) continue;
-    out.push({ num: Number(rawNum), from, to });
+    const num = Number(rawNum);
+    if (!byNum.has(num)) byNum.set(num, []);
+    const observations = byNum.get(num);
+    if (to === '-') {
+      const dropped = observations.pop();
+      if (dropped) retracted.set(num, dropped.to);
+      continue;
+    }
+    const stale = retracted.get(num);
+    retracted.delete(num);
+    observations.push({ num, from: from === stale ? '-' : from, to });
   }
-  return out;
+  return [...byNum.values()].flat();
 }
 
 /** Highest observed stage per distinct current tracker identity.
