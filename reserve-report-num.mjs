@@ -4,9 +4,12 @@
  * reserve-report-num.mjs - shared atomic report-number allocator.
  *
  * The CLI and every evaluator use the exported API below. Reservations account
- * for report files, reservation sentinels, tracker row IDs, and report links in
- * the tracker. The tracker scan and sentinel creation run under the same lock
- * as tracker writers, while O_CREAT|O_EXCL keeps claims atomic across processes.
+ * for report files, reservation sentinels, tracker row IDs, report links in
+ * the tracker, and tracker numbers the ledgers still name after their row was
+ * deleted or merged away (status-log.tsv, follow-ups.md,
+ * salary-observations.tsv, contacts.tsv). The tracker scan and sentinel
+ * creation run under the same lock as tracker writers, while O_CREAT|O_EXCL
+ * keeps claims atomic across processes.
  *
  * Usage:
  *   node reserve-report-num.mjs
@@ -140,10 +143,67 @@ function occupiedFromTracker(trackerPath) {
   return occupied;
 }
 
-function collectOccupied(reportsDir, trackerPath, batchStateFile) {
+// Tracker numbers the ledgers still key on. `tracker.mjs delete` and
+// dedup-tracker.mjs remove a row but leave its status-log lines, follow-ups,
+// salary observations and contacts under its old number. Handing that number
+// to a new row would give the new application the old one's history, so a
+// number any of them still names stays taken even once its row is gone.
+const LEDGER_NUM_RE = /^\d+$/;
+// Legacy follow-up bullets (`- 2026-10-09 · #12 Acme — note`) and the pin and
+// clear directives (`- next #12 2026-10-20`, `- cleared #12 ...`) name the
+// application with their first `#N`.
+const FOLLOWUP_LINE_NUM_RE = /^-\s.*?#(\d+)/;
+
+function ledgerPathsFor(trackerPath, options = {}) {
+  const dataDir = join(options.rootDir || ROOT, 'data');
+  return {
+    // Beside the tracker, as lib/status-hooks.mjs statusLogPath() writes it.
+    statusLog: join(dirname(trackerPath), 'status-log.tsv'),
+    // Same override followup-seed.mjs and followup-cadence.mjs honor.
+    followups: process.env.CAREER_OPS_FOLLOWUPS || join(dataDir, 'follow-ups.md'),
+    salary: join(dataDir, 'salary-observations.tsv'),
+    contacts: join(dataDir, 'contacts.tsv'),
+  };
+}
+
+function readLines(path) {
+  return existsSync(path) ? readFileSync(path, 'utf-8').split(/\r?\n/) : [];
+}
+
+function addLedgerNum(occupied, cell) {
+  const raw = String(cell ?? '').trim();
+  if (!LEDGER_NUM_RE.test(raw)) return;
+  const n = Number(raw);
+  if (Number.isSafeInteger(n) && n > 0) occupied.add(n);
+}
+
+function occupiedFromLedgers(trackerPath, options) {
+  const occupied = new Set();
+  const paths = ledgerPathsFor(trackerPath, options);
+  // status-log.tsv and salary-observations.tsv: tracker# in column 1.
+  for (const path of [paths.statusLog, paths.salary]) {
+    for (const line of readLines(path)) addLedgerNum(occupied, line.split('\t')[0]);
+  }
+  // contacts.tsv: tracker# in column 8, `-` for no application.
+  for (const line of readLines(paths.contacts)) addLedgerNum(occupied, line.split('\t')[7]);
+  // follow-ups.md: table rows are `| num | appNum | ...`.
+  for (const line of readLines(paths.followups)) {
+    if (line.startsWith('|')) {
+      const parts = line.split('|');
+      if (LEDGER_NUM_RE.test(String(parts[1] ?? '').trim())) addLedgerNum(occupied, parts[2]);
+      continue;
+    }
+    const m = line.match(FOLLOWUP_LINE_NUM_RE);
+    if (m) addLedgerNum(occupied, m[1]);
+  }
+  return occupied;
+}
+
+function collectOccupied(reportsDir, trackerPath, batchStateFile, options) {
   const occupied = occupiedFromReports(reportsDir);
   for (const num of occupiedFromTracker(trackerPath)) occupied.add(num);
   for (const num of occupiedFromFailedBatchState(batchStateFile)) occupied.add(num);
+  for (const num of occupiedFromLedgers(trackerPath, options)) occupied.add(num);
   return occupied;
 }
 
@@ -228,7 +288,7 @@ export async function reserveReportNumbers(count = 1, options = {}) {
   });
 
   try {
-    let occupied = collectOccupied(reportsDir, trackerPath, batchStateFile);
+    let occupied = collectOccupied(reportsDir, trackerPath, batchStateFile, options);
     let base = highestNumber(occupied) + 1;
     const token = randomUUID();
 
@@ -253,7 +313,7 @@ export async function reserveReportNumbers(count = 1, options = {}) {
       }
 
       for (const num of claimed) releaseSlot(reportsDir, num, { token });
-      occupied = collectOccupied(reportsDir, trackerPath, batchStateFile);
+      occupied = collectOccupied(reportsDir, trackerPath, batchStateFile, options);
       base = Math.max(failedAt + 1, highestNumber(occupied) + 1);
     }
   } finally {
