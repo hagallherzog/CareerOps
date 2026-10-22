@@ -380,6 +380,7 @@ const SYSTEM_PATHS = [
   'dedup-tracker.mjs',
   'add-entry.mjs',
   'github-evidence.mjs',
+  'evidence-freshness.mjs',
   'role-matcher.mjs',
   'tracker-utils.mjs',
   'tracker-parse.mjs',
