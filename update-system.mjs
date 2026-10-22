@@ -309,6 +309,7 @@ const SYSTEM_PATHS = [
   'lib/gemini-node-floor.mjs',
   'lib/node-floor.mjs',
   'lib/local-today.mjs',
+  'lib/jd-archive-section.mjs',
   'lib/parse-date.mjs',
   'lib/personalization.mjs',
   'lib/reply-proposals.mjs',
