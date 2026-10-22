@@ -30,10 +30,10 @@ console.log('\nJD-archive validator wiring + read-only boundary (#2789)');
 try {
   const jdArchiveSrc = readFile('check-jd-archive.mjs');
 
-  const updaterSrc = readFile('update-system.mjs');
-  const jdArchiveSysBlock = (updaterSrc.match(/SYSTEM_PATHS\s*=\s*\[([\s\S]*?)\]/) || [, ''])[1];
+  const manifestSrc = readFile('lib/update-manifest.mjs');
+  const jdArchiveSysBlock = (manifestSrc.match(/SYSTEM_PATHS\s*=\s*\[([\s\S]*?)\]/) || [, ''])[1];
   if (jdArchiveSysBlock.includes("'check-jd-archive.mjs'")) {
-    pass('check-jd-archive.mjs is in update-system.mjs SYSTEM_PATHS (shipped + updatable)');
+    pass('check-jd-archive.mjs is in SYSTEM_PATHS (lib/update-manifest.mjs: shipped + updatable)');
   } else {
     fail('check-jd-archive.mjs is NOT in SYSTEM_PATHS — updates would never deliver it');
   }
