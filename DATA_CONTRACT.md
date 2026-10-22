@@ -190,6 +190,8 @@ These files contain system logic, scripts, templates, and instructions that impr
 
 **If a file is in the System Layer, it can be safely replaced with the latest version from the upstream repo.**
 
+That is what `update-system.mjs apply` does with every system file this install has not changed. A system file this install did change is kept by default: `apply` lists it, tries to save a `.bak` copy, and leaves your version in place, so that file stops receiving upstream changes. `apply --force` replaces it with the upstream version instead, even when the `.bak` could not be written (`apply` names that file and the error). The updater's own files (`update-system.mjs` and the modules it imports) are always replaced, because `apply` has to run their new versions; a local edit to one survives only in its `.bak`. To keep a customization without giving up its updates, put it in the user layer (`modes/_profile.md`, `modes/_custom.md`, `config/profile.yml`) rather than in a system file.
+
 ## Custom Data Directory
 
 By default, all User Layer files reside inside the project repository root. You can configure a separate, external directory for your personal data.
