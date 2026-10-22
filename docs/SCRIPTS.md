@@ -555,8 +555,8 @@ node github-evidence.mjs          # writes output/github-evidence-{date}.{md,jso
 node github-evidence.mjs --json   # same, and prints the JSON on stdout
 ```
 
-- Only PRs you authored count. Your own repos (owning is not authorship) and
-  forks are listed by name and count only, never as evidence.
+- Only PRs and commits you authored count. Your own repos (owning is not
+  authorship) and forks are listed by name and counts only, never as evidence.
 - A private repo is evidence only when listed in `config/profile.yml`:
   `github_evidence.private_allowlist: ["owner/repo"]` (empty by default). Any
   other private repo, or one whose visibility could not be read, appears by
@@ -565,8 +565,33 @@ node github-evidence.mjs --json   # same, and prints the JSON on stdout
   does not name. `claimCheck.namedNoMerge`: repos `cv.md` names where you have
   no merged PR. Matching is literal and case-insensitive (`owner/repo`, then
   the repo name, then the owner), and each row says which one matched.
+- Commits you authored on each repo's default branch (the commit author is your
+  GitHub account) are counted too, so a repo you push to directly, with no PR,
+  still shows up. Each row carries `commits`: `count`, `first` and `last` date,
+  and `exact`. They sit apart from the PR counts and are never added to them,
+  since a squash-merged PR is also an authored commit. Dates appear only where
+  PR titles would (public and allowlisted repos); other private repos and forks
+  show the count only. Commit messages and diffs are never read.
+  `claimCheck.commitsNotNamed`: third-party repos with commits, no merged PR,
+  and no mention in `cv.md`.
+- Commits are found with one commit search (`search/commits?q=author:<you>`,
+  newest first, 100 per page, pages one second apart, since GitHub rate-limits
+  commit search harder than the rest of the API). It covers every repo your
+  token can read, private and organization repos included. Your own repos and
+  the allowlisted ones are then counted from the repo itself
+  (`repos/<owner>/<repo>/commits?author=<you>&per_page=1`: the `Link` header's
+  last page is the count, and that page holds the oldest commit). Calls on top
+  of the PR step: one search page per 100 authored commits (at most 10); one
+  count call per own or allowlisted repo that is not a fork, plus one for its
+  oldest date when it has more than one commit and its dates are shown; one
+  metadata call per allowlisted repo neither search returned. A repo only the
+  commit search found takes its visibility and fork flag from that result, so
+  its stars read `?`.
 - GitHub search returns at most 1000 results per query; the `truncated` flags
-  say when a list may be incomplete.
+  say when a list may be incomplete, and a commit count with `exact: false` is
+  then a lower bound with `first: null` (the search reads newest first). A failed or partial commit search does not change the
+  exit code: the report is written as usual, and `commitSearch.status` (`ok`,
+  `partial`, `failed`) and `commitSearch.detail` say what happened.
 
 **Exit codes:** `0` report written, `1` usage error or `candidate.github`
 missing/malformed (normalized as in `expand`'s Input step, so a repo link such
