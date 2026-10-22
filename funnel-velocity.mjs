@@ -224,23 +224,33 @@ export function computeVelocity(timelines, todayStr) {
     let sameDayExcluded = 0;
     let censored = 0;
     for (const timeline of timelines.values()) {
-      const fromIdx = timeline.findIndex(o => o.to === hop.from && o.dayMath);
-      if (fromIdx === -1) continue;
-      const later = timeline.slice(fromIdx + 1);
-      const nextIdx = later.findIndex(o => o.to === hop.to && o.dayMath);
-      const next = nextIdx === -1 ? null : later[nextIdx];
-      if (next && hop.excludeIntermediate && later.slice(0, nextIdx).some(o => o.to === hop.excludeIntermediate)) continue;
-      if (next) {
-        const d = daysBetween(timeline[fromIdx].date, next.date);
-        if (d === null || d < 0) continue;
-        if (d === 0) { sameDayExcluded++; continue; }
-        days.push(d);
-      } else if (fromIdx === timeline.length - 1) {
-        // Row's latest state is the hop's from-state: still waiting = censored.
-        // Only forward hops censor; Applied→Rejected shares Applied rows with
-        // Applied→Responded, so count censoring once (on the forward hop).
-        if (hop.to !== 'Rejected') censored++;
+      // A row can re-enter the from-state (re-applied after a rejection), so
+      // each entry starts its own measurement instead of the row's first one.
+      let start = null;
+      let left = false;
+      let viaIntermediate = false;
+      for (const o of timeline) {
+        if (o.to === hop.from && o.dayMath) {
+          if (!start || left) { start = o; left = false; viaIntermediate = false; }
+          continue;
+        }
+        if (!start) continue;
+        if (o.to === hop.to) {
+          if (!o.dayMath) continue;
+          const d = daysBetween(start.date, o.date);
+          start = null;
+          if (viaIntermediate || d === null || d < 0) continue;
+          if (d === 0) { sameDayExcluded++; continue; }
+          days.push(d);
+          continue;
+        }
+        left = true;
+        if (o.to === hop.excludeIntermediate) viaIntermediate = true;
       }
+      // Row's latest state is the hop's from-state: still waiting = censored.
+      // Only forward hops censor; Applied→Rejected shares Applied rows with
+      // Applied→Responded, so count censoring once (on the forward hop).
+      if (start && timeline.at(-1).to === hop.from && hop.to !== 'Rejected') censored++;
     }
     result[hop.key] = {
       from: hop.from,
