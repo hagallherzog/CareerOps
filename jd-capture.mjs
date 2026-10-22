@@ -20,12 +20,21 @@ import { join, extname } from 'path';
 
 /** Slug grammar used by archive-posting.mjs for capture name fields. */
 export function captureSlug(text) {
-  return String(text ?? '')
-    .toLowerCase()
-    .replace(/[^\w\s-]/g, '')
+  const fold = (value) => value
     .replace(/[\s_]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .slice(0, 60);
+  const lowered = String(text ?? '').toLowerCase();
+  const ascii = fold(lowered.replace(/[^\w\s-]/g, ''));
+  if (ascii !== '') return ascii;
+  // A name written entirely in another script (株式会社アクメ, Яндекс, شركة) has no
+  // ASCII word character, so the grammar above reduced it to '' and every such
+  // capture came out as `{date}__.pdf`: two postings on one day overwrote each
+  // other, and companyMatches() treats '' as "attribute nothing", so the capture
+  // was never found again. Only that all-empty case falls back to the letters and
+  // digits of any script, so every slug that was already non-empty is unchanged
+  // and the captures written under it keep resolving.
+  return fold(lowered.normalize('NFC').replace(/[^\p{L}\p{M}\p{N}\s_-]/gu, ''));
 }
 
 /** Zero-pad a report number to the 3-digit form used by reports/ filenames. */
