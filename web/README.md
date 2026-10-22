@@ -229,12 +229,11 @@ Three constraints follow from all this:
   coverage and never execute. Extract the logic under test into a plain `.mjs`
   module (the pattern `src/lib/pdf-paths.mjs` and `src/lib/pdf-render.mjs`
   already follow) and import it from the test.
-- **Web suites use `node:test`; core suites don't.** Here you write
-  `import { test } from "node:test"` with `node:assert/strict`. The root
-  `tests/` suite deliberately uses neither — it has its own `pass`/`fail`
-  helpers, because [#1440](https://github.com/career-ops-hq/career-ops/issues/1440)
-  requires the core suite to run on a bare clone with "no framework, not even
-  `node:test`". Don't carry either style across the boundary.
+- **Web suites use `node:test`.** Here you write
+  `import { test } from "node:test"` with `node:assert/strict`. Don't import the
+  root `tests/helpers.mjs` `pass`/`fail` helpers; they belong to the root
+  `tests/` suite, where `test-all.mjs` runs both those and `node:test` suites
+  ([#2463](https://github.com/career-ops-hq/career-ops/issues/2463)).
 
 `tests/web-test-layout.test.mjs` in the **root** suite enforces all of the above
 on every PR, including that `npm test` never goes back to listing suites by name
